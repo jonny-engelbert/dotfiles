@@ -23,7 +23,9 @@ overwrites anything: an existing file is moved to `<name>.pre-dotfiles` first.
 | `claude/hooks/session-start-learnings-nudge.sh` | SessionStart (`compact`) | Reads that marker back and tells Claude the detail was summarised away and where the full version still is. SessionStart is one of only three events whose stdout reaches Claude's context, which is why this is two hooks and not one. |
 | `claude/hooks/git-guard.sh` | PreToolUse (Bash) | Rule 1: denies branch changes in a pinned reference checkout. Rule 2: asks before destructive git (`reset --hard`, `clean -f`, force-push, `filter-branch`, `branch -D`, `stash drop`, `reflog expire`, `update-ref -d`, `worktree remove --force`). |
 | `claude/hooks/pinned-checkout-tripwire.sh` | PostToolUse (Bash) | Reports when the pinned checkout's tree or branch changed, whatever caused it. |
+| `claude/hooks/ledger-check.sh` | Stop | Reminds you once per session that a repository's GENERATED files are stale — sources changed, nothing regenerated. Inert in every repository that has no config for it. |
 | `claude/hooks/tests/git-guard.test.sh` | — | Regression matrix for the guard. Every case is one that was observed wrong at some point. Run it before changing the guard. |
+| `claude/hooks/tests/ledger-check.test.sh` | — | Matrix for the Stop hook. Most of its cases assert SILENCE. |
 | `claude/settings.hooks.json` | — | The `hooks` block that wires the four hooks up. |
 
 The three memory-related pieces are one mechanism: `/wrap` is the command, and the
@@ -47,6 +49,29 @@ $EDITOR ~/.claude/hooks/pinned-checkout.conf
 - `CLAUDE_PINNED_BRANCH` — the branch it is held on (default `main`)
 
 Environment variables of the same names override the file.
+
+### `ledger-check.sh`
+
+This one is configured per REPOSITORY, not per machine, because the paths it
+watches are a property of the project. It does nothing until it finds a config,
+so installing it costs nothing in projects that don't want it. First hit wins:
+
+1. `$CLAUDE_LEDGER_CHECK_CONFIG`
+2. `<repo>/.claude/ledger-check.json` — checked in, shared with the team
+3. `~/.claude/ledger-check/<main-worktree-name>.json` — for a repository that
+   gitignores its own `.claude/`, and keyed on the MAIN worktree's name so linked
+   worktrees resolve to the same config
+
+Schema, in `claude/hooks/ledger-check.example.json`:
+
+| Key | Meaning |
+|---|---|
+| `sources` | Paths whose change means the generated files may be stale. |
+| `generated` | Paths the generator writes. If these changed too, the hook stays quiet — the pipeline has already been run. |
+| `commands` | Printed verbatim as what to run before pushing. |
+| `label`, `note` | Message wording. |
+| `enabled` | `false` switches it off without deleting the config. |
+| `stepCount` | Optional `{packageJson, script, separator}`. Counts the steps in an npm script and appends `(N steps)`, rather than letting the message hardcode a number that drifts — which is exactly what happened to the hook this was generalized from. |
 
 ## Settings
 

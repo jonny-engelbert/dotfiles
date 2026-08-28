@@ -26,6 +26,17 @@
         ]
       }
     ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "t=\"$HOME/.claude/hooks/ledger-check.sh\"; [ -r \"$t\" ] || exit 0; bash \"$t\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "hooks": [

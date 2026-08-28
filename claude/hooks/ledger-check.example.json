@@ -1,0 +1,25 @@
+{
+  "label": "Requirements gate",
+  "enabled": true,
+  "sources": [
+    "docs/features",
+    "Modules",
+    "Host",
+    "SharedKernel",
+    "tests",
+    "frontend/src"
+  ],
+  "generated": [
+    "docs/reviews/requirements"
+  ],
+  "commands": [
+    "npm run requirements:write     # twice, confirm byte-identical output",
+    "npm run requirements:verify    # CI runs the same command, but is path-filtered"
+  ],
+  "stepCount": {
+    "packageJson": "package.json",
+    "script": "requirements:verify",
+    "separator": " && "
+  },
+  "note": "One reminder per session. Ignore if this change is docs-only or non-product."
+}
