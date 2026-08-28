@@ -1,0 +1,124 @@
+name: hooks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# A change to a hook here changes what runs on every Bash call, on every machine
+# that installed from this repo. Both matrices run on Linux AND macOS on purpose:
+# macOS ships bash 3.2, which has no `mapfile` and no associative arrays, and the
+# hooks are written to that floor. Linux alone would not notice a bash 4 idiom
+# creeping in; macOS alone would not notice a GNU/BSD tool difference.
+
+jobs:
+  matrices:
+    name: hook matrices (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tool preconditions
+        run: |
+          set -euo pipefail
+          # jq is a hard dependency of git-guard.sh and ledger-check.sh; python3
+          # is needed only by the guard matrix. Install rather than skip: a
+          # matrix that silently does not run is the failure mode this whole
+          # repo is written against.
+          if ! command -v jq >/dev/null 2>&1; then
+            if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update -qq && sudo apt-get install -y jq
+            else brew install jq; fi
+          fi
+          printf 'bash    %s\n' "$BASH_VERSION"
+          printf 'jq      %s\n' "$(jq --version)"
+          printf 'python3 %s\n' "$(python3 --version 2>&1)"
+          printf 'git     %s\n' "$(git --version)"
+
+      - name: Syntax and schema
+        run: |
+          set -euo pipefail
+          for f in claude/hooks/*.sh claude/hooks/tests/*.sh install.sh; do
+            bash -n "$f"
+            printf '  parsed  %s\n' "$f"
+          done
+          for f in claude/settings.hooks.json claude/hooks/*.json; do
+            jq empty "$f"
+            printf '  valid   %s\n' "$f"
+          done
+          # A NUL byte in a shell script makes git treat it as binary and is
+          # never intentional here -- one reached a hook during authoring.
+          #
+          # Compared by byte count rather than `grep $'\x00'`: a NUL cannot be
+          # passed as a command argument at all (it terminates the C string), so
+          # that spelling searches for the EMPTY pattern, matches every file, and
+          # would fail every build for the wrong reason.
+          for f in claude/hooks/*.sh claude/hooks/tests/*.sh install.sh; do
+            raw=$(wc -c < "$f")
+            stripped=$(tr -d '\000' < "$f" | wc -c)
+            if [ "$raw" -ne "$stripped" ]; then
+              echo "NUL byte in $f" >&2; exit 1
+            fi
+          done
+          echo "  no NUL bytes"
+
+      - name: Install into a scratch CLAUDE_HOME
+        run: |
+          set -euo pipefail
+          echo "CLAUDE_HOME=$RUNNER_TEMP/claude-home" >> "$GITHUB_ENV"
+          CLAUDE_HOME="$RUNNER_TEMP/claude-home" ./install.sh
+          # Everything below runs the hooks through those symlinks rather than
+          # from the checkout, so the installer is exercised too: a broken
+          # install.sh is exactly as bad as a broken hook.
+          test -L "$RUNNER_TEMP/claude-home/hooks/git-guard.sh"
+          test -L "$RUNNER_TEMP/claude-home/hooks/ledger-check.sh"
+
+      - name: Build a throwaway pinned checkout
+        run: |
+          set -euo pipefail
+          PINNED="$RUNNER_TEMP/pinned"
+          mkdir -p "$PINNED/subdir"
+          git init -q -b main "$PINNED"
+          git -C "$PINNED" config user.email ci@example.com
+          git -C "$PINNED" config user.name ci
+          printf 'x\n' > "$PINNED/subdir/file.txt"
+          git -C "$PINNED" add -A
+          git -C "$PINNED" commit -q -m init
+          # Without this the guard matrix SKIPS every Rule 1 case -- the rule
+          # that actually prevents something -- and reports a pass on the 12
+          # Rule 2 cases alone. A green run that tested a quarter of the guard
+          # is the false green this repo exists to avoid.
+          echo "CLAUDE_PINNED_CHECKOUT=$PINNED" >> "$GITHUB_ENV"
+          echo "CLAUDE_PINNED_BRANCH=main" >> "$GITHUB_ENV"
+          # Ignore any conf file: the matrix must depend only on what CI set.
+          echo "CLAUDE_HOOKS_CONF=/dev/null" >> "$GITHUB_ENV"
+
+      - name: git-guard matrix
+        # NOT `set -e`: with it, the capture below exits the step the instant the
+        # matrix fails, before the output is printed -- so a red build would show
+        # no failing cases. Capture, print, then decide.
+        run: |
+          set -uo pipefail
+          out="$(GUARD="$CLAUDE_HOME/hooks/git-guard.sh" \
+            bash "$CLAUDE_HOME/hooks/tests/git-guard.test.sh" 2>&1)"; rc=$?
+          printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || exit 1
+          # Guard the guard's own coverage. With no pinned fixture the matrix
+          # SKIPS every Rule 1 case -- the rule that actually prevents something
+          # -- and still exits 0 on the 12 Rule 2 cases. That is a pass reporting
+          # a quarter of the suite, which is the exact false green this repo is
+          # written against.
+          if printf '%s' "$out" | grep -q 'Rule 1 sections SKIPPED'; then
+            echo "Rule 1 did not run -- the pinned fixture was not picked up." >&2
+            exit 1
+          fi
+
+      - name: ledger-check matrix
+        run: |
+          set -euo pipefail
+          HOOK="$CLAUDE_HOME/hooks/ledger-check.sh" \
+            bash "$CLAUDE_HOME/hooks/tests/ledger-check.test.sh"
