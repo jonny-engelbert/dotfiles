@@ -1,18 +1,18 @@
 # dotfiles
 
-Claude Code commands and hooks, shared so colleagues can install the same setup.
+Claude Code commands/hooks and Codex skills, shared so colleagues can install the same setup.
 
-Everything here is user-level (`~/.claude`), works in any repository, and is
-configured by one optional file. Nothing here is specific to a particular project.
+Everything here is user-level (`~/.claude` or `~/.codex`), works in any repository,
+and is configured by one optional file. Nothing here is specific to a particular project.
 
 ```bash
 git clone https://github.com/jonny-engelbert/dotfiles.git ~/src/dotfiles
 ~/src/dotfiles/install.sh --dry-run     # see what it would do
-~/src/dotfiles/install.sh               # symlink commands + hooks into ~/.claude
+~/src/dotfiles/install.sh               # symlink Claude assets and Codex skills
 ```
 
-Files are symlinked, so `git pull` updates what Claude runs. `install.sh` never
-overwrites anything: an existing file is moved to `<name>.pre-dotfiles` first.
+Files are symlinked, so `git pull` updates what Claude and Codex run. `install.sh`
+never overwrites anything: an existing file is moved to `<name>.pre-dotfiles` first.
 
 ## What's in here
 
@@ -27,6 +27,10 @@ overwrites anything: an existing file is moved to `<name>.pre-dotfiles` first.
 | `claude/hooks/tests/git-guard.test.sh` | — | Regression matrix for the guard. Every case is one that was observed wrong at some point. Run it before changing the guard. |
 | `claude/hooks/tests/ledger-check.test.sh` | — | Matrix for the Stop hook. Most of its cases assert SILENCE. |
 | `claude/settings.hooks.json` | — | The `hooks` block that wires the four hooks up. |
+| `codex/skills/session-insights/` | `$session-insights` | Produces a privacy-safe, evidence-backed report from accessible Codex and ChatGPT task history. |
+
+Project-specific skills stay with their project. For example, a repository-governed delivery
+pipeline belongs in that repository's `.agents/skills/`, not in this user-level collection.
 
 The three memory-related pieces are one mechanism: `/wrap` is the command, and the
 two compaction hooks are what make it fire when a session is about to lose the
@@ -75,6 +79,11 @@ Schema, in `claude/hooks/ledger-check.example.json`:
 
 ## Settings
 
+`install.sh` symlinks each Codex skill directory into `~/.codex/skills`, so pulling
+this checkout updates the active skill without copying it. If an existing skill or
+Claude asset is not already the expected symlink, the installer moves it to
+`<name>.pre-dotfiles`; it refuses when that backup path already exists.
+
 `install.sh` does not touch `~/.claude/settings.json` unless you pass `--settings`,
 and even then it refuses if you already have a `hooks` key. Claude Code keys each
 hook event to an array, and a jq merge replaces arrays wholesale — so an automatic
@@ -92,6 +101,7 @@ merge would silently drop hooks you already had. Paste from
 
 ```bash
 bash ~/.claude/hooks/tests/git-guard.test.sh
+bash tests/install.test.sh
 ```
 
 Rule 1 cases need a real pinned checkout, so they SKIP until the config names one.
