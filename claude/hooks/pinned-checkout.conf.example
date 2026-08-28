@@ -1,0 +1,21 @@
+# Copy to ~/.claude/hooks/pinned-checkout.conf and edit.
+#
+# Read by git-guard.sh (Rule 1) and pinned-checkout-tripwire.sh. Leave this file
+# absent and both fall back to safe defaults: the guard still ASKS on destructive
+# git commands, and the tripwire does nothing at all.
+#
+# The `: "${VAR:=value}"` form assigns only when the variable is unset, so an
+# environment value beats this file. A plain VAR=value would win over the
+# environment instead -- which is almost never what you want from a config file.
+
+# The reference checkout that other sessions read to answer "what is actually on
+# the main branch?". Absolute path, no trailing slash.
+: "${CLAUDE_PINNED_CHECKOUT:=$HOME/YourRepo}"
+
+# The branch that checkout is held on. Switching to it is always allowed;
+# switching away from it is what the guard denies.
+: "${CLAUDE_PINNED_BRANCH:=main}"
+
+# Optional, used only by the test matrix: an independent repository nested inside
+# the pinned checkout, which the guard must NOT claim as pinned.
+# : "${CLAUDE_PINNED_NESTED_REPO:=$HOME/YourRepo/VendoredThing}"

@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/git-guard.sh\"",
+            "timeout": 10,
+            "statusMessage": "Checking git safety…"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "t=\"$HOME/.claude/hooks/pinned-checkout-tripwire.sh\"; [ -r \"$t\" ] || exit 0; out=$(bash \"$t\" 2>&1); rc=$?; if [ -n \"$out\" ]; then { date -u +'%Y-%m-%dT%H:%M:%SZ'; printf '%s\\n\\n' \"$out\"; } >> \"$HOME/.claude/pinned-checkout-tripwire.log\"; fi; printf '{\"suppressOutput\":true}\\n'; exit $rc",
+            "timeout": 15,
+            "statusMessage": "Checking pinned checkout..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "t=\"$HOME/.claude/hooks/precompact-mark-learnings.sh\"; [ -r \"$t\" ] || exit 0; bash \"$t\"",
+            "timeout": 10,
+            "statusMessage": "Marking session for a memory pass..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "t=\"$HOME/.claude/hooks/session-start-learnings-nudge.sh\"; [ -r \"$t\" ] || exit 0; bash \"$t\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
