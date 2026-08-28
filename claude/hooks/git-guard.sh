@@ -65,11 +65,27 @@ if [ -n "$PINNED_DIR" ]; then
 cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
 [ -n "$cwd" ] || cwd="$PWD"
 
-# The pinned path as an ERE, plus its `~`-spelling when it lives under $HOME.
+# The configured path, resolved through symlinks.
+#
+# `git rev-parse --show-toplevel` reports the PHYSICAL path, so a configured path
+# that traverses a symlink never compares equal to it and Rule 1 silently stops
+# denying anything -- no error, just a guard that has quietly stopped guarding.
+# macOS makes this ordinary rather than exotic: /var, /tmp and /etc are all
+# symlinks into /private, so a pinned checkout anywhere under them is affected,
+# and so is a home directory behind a symlink. Found 2026-08-28 when the CI
+# fixture was created under $RUNNER_TEMP (/var/folders/...) instead of $HOME:
+# 15 of the matrix's Rule 1 cases flipped from deny to none.
+pinned_phys="$(cd "$PINNED_DIR" 2>/dev/null && pwd -P)"
+
+# The pinned path as an ERE: the configured spelling, its resolved spelling when
+# those differ, and its `~`-spelling when it lives under $HOME.
 pinned_re="$(_re_escape "$PINNED_DIR")"
 pinned_alt="$pinned_re"
+if [ -n "$pinned_phys" ] && [ "$pinned_phys" != "$PINNED_DIR" ]; then
+  pinned_alt="$pinned_alt|$(_re_escape "$pinned_phys")"
+fi
 case "$PINNED_DIR" in
-  "$HOME"/*) pinned_alt="~/$(_re_escape "${PINNED_DIR#"$HOME"/}")|$pinned_re" ;;
+  "$HOME"/*) pinned_alt="~/$(_re_escape "${PINNED_DIR#"$HOME"/}")|$pinned_alt" ;;
 esac
 branch_re="$(_re_escape "$PINNED_BRANCH")"
 
@@ -91,7 +107,10 @@ in_pinned=0
 # which textual matching can see. Costs one subprocess (~8ms), and only on commands
 # that already matched the git bail-out above.
 top=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)
-[ -n "$top" ] && [ "$top" = "$PINNED_DIR" ] && in_pinned=1
+if [ -n "$top" ]; then
+  [ "$top" = "$PINNED_DIR" ] && in_pinned=1
+  [ -n "$pinned_phys" ] && [ "$top" = "$pinned_phys" ] && in_pinned=1
+fi
 # ...or the command reaches into the pinned checkout explicitly.
 m "git[[:space:]]+-C[[:space:]]+[\"']?($pinned_alt)/?[\"']?([[:space:]]|$)" && in_pinned=1
 m "cd[[:space:]]+[\"']?($pinned_alt)/?[\"']?([[:space:]]|;|&|$)" && in_pinned=1
