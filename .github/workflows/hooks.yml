@@ -42,7 +42,7 @@ jobs:
       - name: Syntax and schema
         run: |
           set -euo pipefail
-          for f in claude/hooks/*.sh claude/hooks/tests/*.sh install.sh; do
+          for f in claude/hooks/*.sh claude/hooks/tests/*.sh tests/*.sh install.sh; do
             bash -n "$f"
             printf '  parsed  %s\n' "$f"
           done
@@ -57,7 +57,7 @@ jobs:
           # passed as a command argument at all (it terminates the C string), so
           # that spelling searches for the EMPTY pattern, matches every file, and
           # would fail every build for the wrong reason.
-          for f in claude/hooks/*.sh claude/hooks/tests/*.sh install.sh; do
+          for f in claude/hooks/*.sh claude/hooks/tests/*.sh tests/*.sh install.sh; do
             raw=$(wc -c < "$f")
             stripped=$(tr -d '\000' < "$f" | wc -c)
             if [ "$raw" -ne "$stripped" ]; then
@@ -70,12 +70,17 @@ jobs:
         run: |
           set -euo pipefail
           echo "CLAUDE_HOME=$RUNNER_TEMP/claude-home" >> "$GITHUB_ENV"
-          CLAUDE_HOME="$RUNNER_TEMP/claude-home" ./install.sh
+          echo "CODEX_HOME=$RUNNER_TEMP/codex-home" >> "$GITHUB_ENV"
+          CLAUDE_HOME="$RUNNER_TEMP/claude-home" CODEX_HOME="$RUNNER_TEMP/codex-home" ./install.sh
           # Everything below runs the hooks through those symlinks rather than
           # from the checkout, so the installer is exercised too: a broken
           # install.sh is exactly as bad as a broken hook.
           test -L "$RUNNER_TEMP/claude-home/hooks/git-guard.sh"
           test -L "$RUNNER_TEMP/claude-home/hooks/ledger-check.sh"
+          test -L "$RUNNER_TEMP/codex-home/skills/session-insights"
+
+      - name: Installer matrix
+        run: bash tests/install.test.sh
 
       - name: Build a throwaway pinned checkout
         run: |

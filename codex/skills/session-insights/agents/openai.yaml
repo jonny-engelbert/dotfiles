@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Insights"
+  short_description: "Analyze task history into actionable insights"
+  default_prompt: "Use $session-insights to analyze my accessible tasks from the past 30 days."
