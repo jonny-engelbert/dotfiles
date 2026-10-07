@@ -115,6 +115,3 @@ because the session it was protecting is about to close.
 
   It is a SKILL, not a command: invoke it as `consolidate-memory` (it is published by the
   `anthropic-skills` plugin, so it may be listed as `anthropic-skills:consolidate-memory`).
-  This line used to say `/consolidate-memory`, and there has never been a command file of
-  that name anywhere under `~/.claude` or `~/dotfiles` — so anyone following the reference
-  literally got "unknown command" and reasonably concluded the tidying pass did not exist.
