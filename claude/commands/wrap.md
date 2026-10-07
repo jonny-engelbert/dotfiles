@@ -108,6 +108,10 @@ because the session it was protecting is about to close.
 
 ## Related
 
-- `/consolidate-memory` is the periodic *tidying* pass over the whole store — merge
-  duplicates, prune the index. This command is the per-session *capture* pass. Run this
-  one at close; run that one when the store starts feeling crowded.
+- The **`consolidate-memory` skill** is the periodic *tidying* pass over the whole store —
+  merge duplicates, fix stale facts, prune the index. This command is the per-session
+  *capture* pass. Run this one at close; invoke that one when the store starts feeling
+  crowded.
+
+  It is a SKILL, not a command: invoke it as `consolidate-memory` (it is published by the
+  `anthropic-skills` plugin, so it may be listed as `anthropic-skills:consolidate-memory`).
