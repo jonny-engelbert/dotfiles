@@ -98,7 +98,7 @@ content in the index.
 Read back each file you wrote and confirm the index line resolves to a file that exists:
 
 ```bash
-ls "$MEMORY_DIR"
+ls <memory directory>    # the absolute path from your system prompt; no variable holds it
 ```
 
 Then report, in a few lines: what was written or updated, what was rejected and why, and
